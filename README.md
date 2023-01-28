@@ -15,7 +15,7 @@ conda activate FedBFPT
 ```python
 pip install requirements.txt
 ```
-## 2.Data
+## 2. Data
 1. Corpus
 Our corpus are download from "https://github.com/allenai/s2orc", you can download the specialized domain corpus you are interested in, then put them in the folder "./data/corpus/", such as: 
 ```
