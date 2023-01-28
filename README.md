@@ -31,5 +31,5 @@ All baseline model files are downloaded from huggingface, you can get the specif
 ```
 "./model/bert-base-uncased/link.txt"
 ```
-we can only download the "config.json", "pytorch_model.bin" and "vocab.txt". In all baseline model, you have to download model is "bert-base-uncased".
+we can only download the "config.json", "pytorch_model.bin" and "vocab.txt". In all baseline model, you have to download model is __"bert-base-uncased"__.
 
