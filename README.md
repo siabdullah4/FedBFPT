@@ -5,7 +5,9 @@ To combat the limited computation and communication resources on the client side
 1. We suggest you create a Conda environment called "FedBFPT" with Python 3.9 (any version >= 3.6 should work):
 ```python
 conda create -n FedBFPT python=3.9
+```
 then do
 ```python
 conda activate FedBFPT
+```
 2.
