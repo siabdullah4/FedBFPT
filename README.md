@@ -17,9 +17,19 @@ pip install requirements.txt
 ```
 ## 2.Data
 1. Corpus
-Our corpus are download from "https://github.com/allenai/s2orc", you can download the specialized domain corpus you are interested in, then put them in the folder "./data/corpus/", such as: "./data/corpus/Biology/pdf_parses_50.jsonl".
+Our corpus are download from "https://github.com/allenai/s2orc", you can download the specialized domain corpus you are interested in, then put them in the folder "./data/corpus/", such as: 
+```
+"./data/corpus/Biology/pdf_parses_50.jsonl"
+```
 2. Datasets
-You can then run the "xxx.py" to transform the corpus into a dataset that can be used for training, then stored them in folder "./data/datasets/", such as "./data/datasets/Biology/test_0_128.pt".
+You can then run the "xxx.py" to transform the corpus into a dataset that can be used for training, then stored them in folder "./data/datasets/", such as :
+```
+"./data/datasets/Biology/test_0_128.pt"
+```
 3. Model
-All baseline model files are downloaded from huggingface, you can get the specific download link from the corresponding folder, such as "./model/bert-base-uncased/link.txt", we can only download the "config.json", "pytorch_model.bin" and "vocab.txt". In all baseline model, you have to download model is "bert-base-uncased".
+All baseline model files are downloaded from huggingface, you can get the specific download link from the corresponding folder, such as:
+```
+"./model/bert-base-uncased/link.txt"
+```
+we can only download the "config.json", "pytorch_model.bin" and "vocab.txt". In all baseline model, you have to download model is "bert-base-uncased".
 
