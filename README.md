@@ -22,7 +22,7 @@ Our corpus are download from "https://github.com/allenai/s2orc", you can downloa
 "./data/corpus/Biology/pdf_parses_50.jsonl"
 ```
 2. Datasets
-You can then run the "xxx.py" to transform the corpus into a dataset that can be used for training, then stored them in folder "./data/datasets/", such as :
+You can then set path and run the "buildDatasets.py" to transform the corpus into a dataset that can be used for training, then stored them in folder "./data/datasets/", such as :
 ```
 "./data/datasets/Biology/test_0_128.pt"
 ```
