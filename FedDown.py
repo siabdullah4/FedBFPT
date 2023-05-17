@@ -16,7 +16,7 @@ from downstream_train import data_load, data_read, num_token, down_classier, mod
 
 
 def client_dataloader(bert_model, file_type, client_num, device, batch_size):
-    inputs, labels, masks = data_read(bert_model, file_type)  # 获取数据
+    inputs, labels, masks = data_read(bert_model, file_type)  
     data_num = int(len(inputs) / client_num)
 
     dataloader_list = []
@@ -30,7 +30,7 @@ def client_dataloader(bert_model, file_type, client_num, device, batch_size):
         client_labels = torch.tensor(client_labels).to(device)
         client_masks = torch.tensor(client_masks).to(device)
 
-        # 生成dataloader
+        # dataloader
         client_data = TensorDataset(client_inputs, client_masks, client_labels)
         sampler = RandomSampler(client_data)
         dataloader = DataLoader(client_data, sampler=sampler, batch_size=batch_size, shuffle=False)
@@ -45,11 +45,11 @@ def fed_classifier(model_path, device, batch_size, seed, epoch, learning_rate):
     client_num = 6
     param_dict = './outputs/LayerModel/Chemprot/Pro3_6_e5/'
 
-    # 清空已经更新过的无用参数，适用于客户端训练相同的参数
+    # Clear the already updated useless parameters, which is suitable for the client to train the same parameters
     shutil.rmtree(param_dict)
     os.makedirs(param_dict)
 
-    param_container = utils.create_container()  # 制作本地参数容器
+    param_container = utils.create_container()  # create local parameter pool
 
     dataloader_list = client_dataloader(model_path, 'train', client_num, device, batch_size)
 
@@ -58,18 +58,17 @@ def fed_classifier(model_path, device, batch_size, seed, epoch, learning_rate):
     scheduler_list = []
 
     for i in range(client_num):
-        # layer_num = random.randint(3, 7)  # 产生模型架构层数，3-6之间
+        # layer_num = random.randint(3, 7)  # create layer number list, between 3-6
 
-        print("模型transformer层数为：%d" % layer_num)
+        print("The number of transformer is: %d" % layer_num)
         method.setup_seed(seed)
         modelConfig = BertConfig.from_pretrained(model_path)
-        modelConfig.num_hidden_layers = layer_num  # 相当于构建一个小模型，transformer层只有六层
-        modelConfig.num_labels = num_token  # 设置分类模型的输出个数
+        modelConfig.num_hidden_layers = layer_num  # create a small mode, which have 6 transformer
+        modelConfig.num_labels = num_token  # set classfication number
         model = BertForSequenceClassification.from_pretrained(model_path, config=modelConfig)
-        # model = utils.map9to3(model)  # 平均高层
+        # model = utils.map9to3(model)  # averge higher layers
 
-        # model = utils.map_ori_layer(model, param_container, 11, layer_num)  # 匹配映射高层
-
+        # model = utils.map_ori_layer(model, param_container, 11, layer_num)  # sampling and mapping deeper layers
         optimizer = torch.optim.AdamW(
             model.parameters(),
             lr=learning_rate,
@@ -81,57 +80,56 @@ def fed_classifier(model_path, device, batch_size, seed, epoch, learning_rate):
         model_list.append(model)
 
     validation_dataloader = data_load(model_path, 'dev', device, batch_size)
-    val_acc = []  # 训练过程中的验证集精度
-    # 测试训练结果
+    val_acc = []  
     test_acc = []
     test_dataloader = data_load(model_path, 'test', device, batch_size)
 
     for i in range(epoch):
-        # 记录本轮联邦存储的位置，如果文件夹不存在，则进行文件夹的创建
+        # Record the location of the current round of federal storage, and if the folder does not exist, create the folder
         epoch_save = param_dict + 'epoch_' + str(i + 1) + '/'
         if not os.path.exists(epoch_save):
             os.makedirs(epoch_save)
 
-        drop_layer = 1  # 训练倒数第几层的参数
+        drop_layer = 1  # the layer that we need to train 
 
         for j in range(client_num):
-            print("%d轮联邦%d号设备训练中------" % (i + 1, j))
+            print("%d epoch of %d client training------" % (i + 1, j))
 
             param_read = param_dict + 'epoch_' + str(i) + '/fed_avg.pt'
             param_save = epoch_save + 'client_' + str(j) + '.pt'
 
             if i != 0:
-                # 如果不是第一轮联邦训练，则更新模型之前训练聚合得到的参数
+                # If not the first round of federated training, update the parameters obtained from the training aggregation before the model
                 param_container = utils.update_container(param_container, param_read, map_num=layer_num)
                 model_list[j] = utils.re_param(model_list[j], param_read)
 
-            # 重构模型的lower层
+            # rebuild lower layers of model
             model_list[j] = utils.lower_build(model_list[j], param_container, layer_length=layer_num - drop_layer,
                                               drop_layer=drop_layer, ori_layer=12 - drop_layer)
 
-            model_list[j] = utils.train_trans_layer(model_list[j], [layer_num - drop_layer])  # 训练特定的transformer layers
-            model_list[j] = utils.train_cls_layer(model_list[j])  # 训练分类输出层
+            model_list[j] = utils.train_trans_layer(model_list[j], [layer_num - drop_layer])  # training specialized transformer layers
+            model_list[j] = utils.train_cls_layer(model_list[j])  # training cls layers
 
             for name, param in model_list[j].named_parameters():
                 if param.requires_grad:
                     print("Train: " + name)
 
-            # 进行分类训练
+            # downstream task training
             model_list[j] = down_classier(model_list[j], dataloader_list[j], device, learning_rate,
                                           optimizer_list[j], scheduler_list[j])
-            # 保存client更新的参数
+            # saving updated parameters
             utils.layer_save(model_list[j], param_save)
 
-        # 进行联邦聚合
+        # merge
         utils.federated_efficient_merge(epoch_save)
 
-        # 进行大模型的测试
+        # test model
         method.setup_seed(seed)
         full_modelConfig = BertConfig.from_pretrained(model_path)
-        full_modelConfig.num_labels = num_token  # 设置分类模型的输出个数
+        full_modelConfig.num_labels = num_token  
 
         full_model = BertForSequenceClassification.from_pretrained(model_path, config=full_modelConfig)
-        # 根据已经保存的文件重新构建模型的某些参数
+        # rebuild model 
         full_model = utils.re_param(full_model, epoch_save + 'fed_avg.pt')
         full_model.to(device)
 
@@ -139,8 +137,7 @@ def fed_classifier(model_path, device, batch_size, seed, epoch, learning_rate):
         val_acc.append(v_acc)
         t_acc = model_test(full_model, test_dataloader, device, 'Test')
         test_acc.append(t_acc)
-
-    # 返回最后的测试结果
+        
     return val_acc, test_acc
 
 
@@ -149,33 +146,31 @@ def center_classifier(model_path, device, batch_size, seed, epoch, learning_rate
 
     param_dict = './outputs/LayerModel/Chemprot/Center_Pro/'
 
-    param_container = utils.create_container()  # 制作本地参数容器
+    param_container = utils.create_container()  # create local parameter pool
 
-    # 清空已经更新过的无用参数，适用于客户端训练相同的参数
+    # Clear the already updated useless parameters, which is suitable for the client to train the same parameters
     shutil.rmtree(param_dict)
     os.makedirs(param_dict)
 
     method.setup_seed(seed)
     modelConfig = BertConfig.from_pretrained(model_path)
-    modelConfig.num_hidden_layers = layer_num  # 相当于构建一个小模型，transformer层只有六层
-    modelConfig.num_labels = num_token  # 设置分类模型的输出个数
+    modelConfig.num_hidden_layers = layer_num  # create a small mode, which have 6 transformer
+    modelConfig.num_labels = num_token  # set number of classification 
     model = BertForSequenceClassification.from_pretrained(model_path, config=modelConfig)
 
     train_dataloader = data_load(model_path, 'train', device, batch_size)
     validation_dataloader = data_load(model_path, 'dev', device, batch_size)
-    val_acc = []  # 训练过程中的验证集精度
-    # 测试训练结果
+    val_acc = [] 
     test_acc = []
     test_dataloader = data_load(model_path, 'test', device, batch_size)
 
     drop_layer = 1
 
-    # 重构模型的lower层
     # model = utils.lower_build(model, param_container, layer_length=layer_num - drop_layer,
     #                           drop_layer=drop_layer, ori_layer=12 - drop_layer)
 
-    model = utils.train_trans_layer(model, [9, 10, 11])  # 训练特定的transformer layers
-    model = utils.train_cls_layer(model)  # 训练分类输出层
+    model = utils.train_trans_layer(model, [9, 10, 11])  
+    model = utils.train_cls_layer(model) 
 
     for name, param in model.named_parameters():
         if param.requires_grad:
@@ -187,10 +182,9 @@ def center_classifier(model_path, device, batch_size, seed, epoch, learning_rate
     )
     scheduler = torch.optim.lr_scheduler.ExponentialLR(optimizer, gamma=0.7)
 
-    # 进行大模型的测试
     method.setup_seed(seed)
     full_modelConfig = BertConfig.from_pretrained(model_path)
-    full_modelConfig.num_labels = num_token  # 设置分类模型的输出个数
+    full_modelConfig.num_labels = num_token
 
     full_model = BertForSequenceClassification.from_pretrained(model_path, config=full_modelConfig)
     full_model.to(device)
@@ -203,10 +197,10 @@ def center_classifier(model_path, device, batch_size, seed, epoch, learning_rate
 
         model = down_classier(model, train_dataloader, device, learning_rate, optimizer, scheduler)
 
-        # 保存client更新的参数
+        # save client training parameters
         utils.layer_save(model, epoch_save + 'layer.pt')
 
-        # 根据已经保存的文件重新构建模型的某些参数
+        # rebuild model
         full_model = utils.re_param(full_model, epoch_save + 'layer.pt')
 
         v_acc = model_test(full_model, validation_dataloader, device, 'Val')
@@ -214,7 +208,6 @@ def center_classifier(model_path, device, batch_size, seed, epoch, learning_rate
         t_acc = model_test(full_model, test_dataloader, device, 'Test')
         test_acc.append(t_acc)
 
-    # 返回最后的测试结果
     return val_acc, test_acc
 
 
