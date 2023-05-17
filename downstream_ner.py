@@ -15,7 +15,7 @@ import torch
 import method
 import utils
 
-data_path = './data/ner/SciERC/'  # 数据集路径
+data_path = './data/ner/SciERC/'  
 unique_tags, tag2id, id2tag = method.ner_label(data_path)
 
 
@@ -64,11 +64,11 @@ def encode_tags(tags, encodings):
     # print(labels)
     encoded_labels = []
     for doc_labels, doc_offset in zip(labels, encodings.offset_mapping):
-        # 创建全由-100组成的矩阵
+        
         doc_enc_labels = np.ones(len(doc_offset), dtype=int) * -100
         arr_offset = np.array(doc_offset)
         # set labels whose first offset position is 0 and the second is not 0
-        if len(doc_labels) >= 510:  # 防止异常
+        if len(doc_labels) >= 510:  
             doc_labels = doc_labels[:510]
         doc_enc_labels[(arr_offset[:, 0] == 0) & (arr_offset[:, 1] != 0)] = doc_labels
         encoded_labels.append(doc_enc_labels.tolist())
@@ -81,17 +81,17 @@ def data_load(model_path, batch_size, data_type, split_zie=-0.1):
     texts, tags = data_read(data_type)
 
     tokenizer = BertTokenizerFast.from_pretrained(model_path)
-    # is_split_into_words表示已经分词好了
+    
     encodings = tokenizer(texts, is_split_into_words=True, return_offsets_mapping=True, padding=True,
                           truncation=True, max_length=512)
 
     labels = encode_tags(tags, encodings)
-    encodings.pop("offset_mapping")  # 训练不需要这个
+    encodings.pop("offset_mapping") 
 
     dataset = NerDataset(encodings, labels)
 
     if split_zie != -0.1:
-        #  随机划分部分数据集用于训练
+        
         data_size = int(split_zie * len(dataset))
         print("Choose " + str(split_zie) + " Data for Training!")
         dataset, remain_data = random_split(dataset=dataset, lengths=[data_size, len(dataset) - data_size])
@@ -103,41 +103,36 @@ def data_load(model_path, batch_size, data_type, split_zie=-0.1):
 
 
 def token2span(token_list):
-    """
-    将token转换为(start, end, entity)的元组形式
-    :param token_list:
-    :return: 返回由元组构成的实体列表
-    """
     span_list = []
     span_tuple = []
     merge_flag = False
     for i in range(len(token_list)):
-        if token_list[i][0] == 'B':  # 如果起始字符是'B'
-            if merge_flag:  # 如果还在合并过程中
-                span_tuple.append(i - 1)  # 添加end终止位置
-                span_tuple.append(token_list[i - 1][2:])  # 添加entity类型
-                span_list.append(tuple(span_tuple))  # 添加entity元组
+        if token_list[i][0] == 'B':  
+            if merge_flag:  
+                span_tuple.append(i - 1)  
+                span_tuple.append(token_list[i - 1][2:])  
+                span_list.append(tuple(span_tuple))  
                 span_tuple = []
 
             merge_flag = True
-            span_tuple.append(i)  # 添加start起始位置
+            span_tuple.append(i)  
 
-        elif token_list[i][0] == 'I':  # 如果起始字符是'I'
-            if merge_flag:  # 如果还在合并过程中
+        elif token_list[i][0] == 'I': 
+            if merge_flag:  
                 continue
             else:  # 如果是单个字符
-                span_tuple.append(i)  # 添加start起始位置
-                span_tuple.append(i)  # 添加end终止位置
-                span_tuple.append(token_list[i][2:])  # 添加entity类型
-                span_list.append(tuple(span_tuple))  # 添加entity元组
+                span_tuple.append(i)  
+                span_tuple.append(i)  
+                span_tuple.append(token_list[i][2:])  
+                span_list.append(tuple(span_tuple))  
                 span_tuple = []
 
-        else:  # 如果是'O'
-            if merge_flag:  # 如果还在合并过程中
+        else: 
+            if merge_flag:  
                 merge_flag = False
-                span_tuple.append(i - 1)  # 添加end终止位置
-                span_tuple.append(token_list[i - 1][2:])  # 添加entity类型
-                span_list.append(tuple(span_tuple))  # 添加entity元组
+                span_tuple.append(i - 1)  
+                span_tuple.append(token_list[i - 1][2:])  
+                span_list.append(tuple(span_tuple))  
                 span_tuple = []
 
     return span_list
@@ -153,13 +148,6 @@ def setup_seed(seed):
 
 
 def model_test(model, test_dataloader, device, model_type):
-    """
-    对模型的准确度在特定数据集上进行测试
-    :param model: 待测试的模型
-    :param test_dataloader: 评测数据集
-    :param device: 是否使用GPU
-    :param model_type: 测试模型种类
-    """
     model.eval()
     pred_token_list = []
     label_token_list = []
@@ -205,22 +193,20 @@ def ner_train(learning_rate, model_path, epochs, device, batch_size,
     setup_seed(seed)
 
     modelConfig = BertConfig.from_pretrained(model_path)
-    modelConfig.num_labels = len(unique_tags)  # 设置分类模型的输出个数
+    modelConfig.num_labels = len(unique_tags) 
     model = BertForTokenClassification.from_pretrained(model_path, config=modelConfig)
 
     if change_param:
-        # 根据已经保存的文件重新构建模型的某些参数
+    
         model = utils.re_param(model, change_param)
 
     optimizer = AdamW(filter(lambda p: p.requires_grad, model.parameters()), lr=learning_rate)
     scheduler = torch.optim.lr_scheduler.ExponentialLR(optimizer, gamma=0.7)
 
     model.to(device)
-    val_acc = []  # 训练过程中的验证集精度
-    # 测试训练结果
+    val_acc = []  
     test_acc = []
 
-    # 先导入数据
     train_dataloader = data_load(model_path, batch_size, 'train')
     validation_dataloader = data_load(model_path, batch_size, 'dev')
     test_dataloader = data_load(model_path, batch_size, 'test')
@@ -231,7 +217,6 @@ def ner_train(learning_rate, model_path, epochs, device, batch_size,
     # model_test(model, validation_dataloader, device, 'Val ')
     for i in range(epochs):
         print("Epochs:%d/%d" % ((i + 1), epochs))
-        # 训练开始
         model.train()
         tr_loss = 0
         nb_tr_steps = 0
@@ -250,7 +235,6 @@ def ner_train(learning_rate, model_path, epochs, device, batch_size,
 
         scheduler.step()
         print("Train loss: {}".format(tr_loss / nb_tr_steps))
-        # 模型评估
         acc = model_test(model, validation_dataloader, device, 'Val ')
         val_acc.append(acc)
         acc1 = model_test(model, test_dataloader, device, 'Test ')
@@ -280,10 +264,10 @@ def find_lr():
 
     for x in range(2, 9):
         learn_rate = x / (10 ** 5)
-        print("DownStream Learning Rate:" + str(learn_rate) + "训练中------")
+        print("DownStream Learning Rate:" + str(learn_rate) + "is training------")
         for i in range(6, 0, -1):
             batch_size = 2 ** i
-            print("Batch Size:" + str(batch_size) + "训练中------")
+            print("Batch Size:" + str(batch_size) + "is training------")
             val_acc0, test_acc0 = ner_train(learn_rate, model_path, epochs, device, batch_size,
                                             change_param=Pro3_6_e5, seed=seed)
 
@@ -299,7 +283,7 @@ def find_lr():
             print("--------------------------------------------------------")
 
     best_index = Max_Acc.index(max(Max_Acc))
-    print("Best 参数为：")
+    print("Best parameters: ")
     print(legend[best_index])
     print('Highest Val Acc:%f,Epoch:%d' % (Val_Acc[best_index][Index_list[best_index]], Index_list[best_index]),
           end=', \t')
@@ -321,8 +305,8 @@ def main():
     print(device)
     print("--------------------------")
 
-    bert_model1 = './model/Computer/'  # 预训练模型的文件
-    print("Computer SkipBert模型ner训练测试中------")
+    bert_model1 = './model/Computer/' 
+    print("Computer SkipBert ner task------")
     val_acc3, test_acc3 = ner_train(bert_model1, epochs, device, batch_size, learning_rate)
 
     legend = ['SciERC']
