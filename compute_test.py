@@ -33,7 +33,7 @@ def train_first(model):
 def get_optimizer(model, learning_rate):
     param_optimizer = list(model.named_parameters())
     no_decay = ['bias', 'LayerNorm.bias', 'LayerNorm.weight']
-    optimizer_grouped_parameters = [  # 剔除requires_grad == False 的参数
+    optimizer_grouped_parameters = [  # except requires_grad == False
         {'params': [p for n, p in param_optimizer if (not any(nd in n for nd in no_decay) and p.requires_grad)],
          'weight_decay': 0.01},
         {'params': [p for n, p in param_optimizer if (any(nd in n for nd in no_decay) and p.requires_grad)],
@@ -56,8 +56,6 @@ def mlm_train(model, dataloader, device, optimizer):
         loss.backward()
         optimizer.step()
 
-        # break  # 仅测试一个batch即可
-
 
 def compute_cost():
     learning_rate = 5e-5
@@ -68,14 +66,14 @@ def compute_cost():
     file_path = './data/datasets/Computer/test_0_128.pt'
     # file_path = './data/datasets/Center/Biology_128.pt'
 
-    print("数据加载中-------")
+    print("Data loading-------")
     tokenizer = BertTokenizerFast.from_pretrained(model_path0, do_lower_case=True)
     datasets = torch.load(file_path)
     data_collator = DataCollatorForLanguageModeling(tokenizer=tokenizer, mlm=True, mlm_probability=0.15)
 
     dataloader = DataLoader(datasets, batch_size=batch_size, collate_fn=data_collator)
 
-    print("Bert参数更新训练--------")
+    print("Bert--------")
     method.setup_seed(seed)
     modelConfig = BertConfig.from_pretrained(model_path0)
 
@@ -91,7 +89,7 @@ def compute_cost():
     t2 = timer()
     print("-----------------------")
 
-    print("DistillBert参数更新训练--------")
+    print("DistillBert--------")
     model_path1 = './model/DistillBert/'
     method.setup_seed(seed)
     modelConfig_1 = BertConfig.from_pretrained(model_path1)
@@ -109,7 +107,7 @@ def compute_cost():
     t4 = timer()
     print("-----------------------")
 
-    print("TinyBert_6参数更新训练--------")
+    print("TinyBert_6--------")
     model_path2 = './model/TinyBert_6/'
     method.setup_seed(seed)
     modelConfig_2 = BertConfig.from_pretrained(model_path2)
@@ -127,7 +125,7 @@ def compute_cost():
     t6 = timer()
     print("-----------------------")
 
-    print("TinyBert_4参数更新训练--------")
+    print("TinyBert_4--------")
     model_path3 = './model/TinyBert_4/'
     method.setup_seed(seed)
     modelConfig_3 = BertConfig.from_pretrained(model_path3)
@@ -145,14 +143,14 @@ def compute_cost():
     t8 = timer()
     print("-----------------------")
 
-    print("LayerModel_6参数更新训练--------")
+    print("LayerModel_6--------")
     model_path4 = './model/bert-base-uncased/'
     method.setup_seed(seed)
     modelConfig_4 = BertConfig.from_pretrained(model_path4)
-    modelConfig_4.num_hidden_layers = 6  # 中间仅含有6层transformer layers
+    modelConfig_4.num_hidden_layers = 6  # have 6 transformer layers
     model_4 = BertForMaskedLM.from_pretrained(model_path4, config=modelConfig_4)
-    model_4 = train_first(model_4)  # 仅更新第一层的参数
-    model_4 = utils.train_cls_layer(model_4)  # 输出层进行训练
+    model_4 = train_first(model_4)  # only train first layer
+    model_4 = utils.train_cls_layer(model_4)  # train output layer
     model_4.to(device)
 
     optimizer_4 = get_optimizer(model_4, learning_rate)
@@ -165,11 +163,11 @@ def compute_cost():
     t10 = timer()
     print("-----------------------")
 
-    print("Bert参数训练耗时：%s S" % (t2 - t1))
-    print("DistillBert参数训练耗时：%s S" % (t4 - t3))
-    print("TinyBert_6参数训练耗时：%s S" % (t6 - t5))
-    print("TinyBert_4参数训练耗时：%s S" % (t8 - t7))
-    print("FedBFPT参数训练耗时：%s S" % (t10 - t9))
+    print("Bert training cost: %s S" % (t2 - t1))
+    print("DistillBert training cost: %s S" % (t4 - t3))
+    print("TinyBert_6 training cost: %s S" % (t6 - t5))
+    print("TinyBert_4 training cost: %s S" % (t8 - t7))
+    print("FedBFPT training cost: %s S" % (t10 - t9))
 
 
 def down_cost():
@@ -186,8 +184,8 @@ def down_cost():
 
     method.setup_seed(seed)
     modelConfig_0 = BertConfig.from_pretrained(model_path)
-    modelConfig_0.num_hidden_layers = 12  # 相当于构建一个小模型，transformer层只有六层
-    modelConfig_0.num_labels = num_token  # 设置分类模型的输出个数
+    modelConfig_0.num_hidden_layers = 12  
+    modelConfig_0.num_labels = num_token 
     model_0 = BertForSequenceClassification.from_pretrained(model_path, config=modelConfig_0)
 
     model_0.to(device)
@@ -198,7 +196,7 @@ def down_cost():
     )
     scheduler_0 = torch.optim.lr_scheduler.ExponentialLR(optimizer_0, gamma=0.7)
 
-    print("Full Model所有参数更新训练--------")
+    print("Full Model=--------")
     for name, param in model_0.named_parameters():
         if param.requires_grad:
             print(name)
@@ -209,11 +207,11 @@ def down_cost():
 
     method.setup_seed(seed)
     modelConfig_1 = BertConfig.from_pretrained(model_path)
-    modelConfig_1.num_hidden_layers = 12  # 相当于构建一个小模型，transformer层只有六层
-    # modelConfig.adapter_nums = 6  # 高层含有adapters的数目
-    modelConfig_1.has_adapter = True  # 设置开启adapter(diy)
-    modelConfig_1.isLinear = False  # 非线性参数
-    modelConfig_1.num_labels = num_token  # 设置分类模型的输出个数
+    modelConfig_1.num_hidden_layers = 12  # local model transformr layers number
+    # modelConfig.adapter_nums = 6  # the number of have adapters
+    modelConfig_1.has_adapter = True  
+    modelConfig_1.isLinear = False  
+    modelConfig_1.num_labels = num_token  
     model_1 = BertAdapterForSequenceClassification.from_pretrained(model_path, config=modelConfig_1)
 
     model_1.to(device)
@@ -231,7 +229,7 @@ def down_cost():
     )
     scheduler_1 = torch.optim.lr_scheduler.ExponentialLR(optimizer_1, gamma=0.7)
 
-    print("Full Model所有Adapters更新训练--------")
+    print("Full Model--------")
     for name, param in model_1.named_parameters():
         if param.requires_grad:
             print(name)
@@ -242,11 +240,11 @@ def down_cost():
 
     method.setup_seed(seed)
     modelConfig_2 = BertConfig.from_pretrained(model_path)
-    modelConfig_2.num_hidden_layers = 12  # 相当于构建一个小模型，transformer层只有六层
-    modelConfig_2.adapter_nums = 6  # 高层含有adapters的数目
-    modelConfig_2.has_adapter = True  # 设置开启adapter(diy)
-    modelConfig_2.isLinear = False  # 非线性参数
-    modelConfig_2.num_labels = num_token  # 设置分类模型的输出个数
+    modelConfig_2.num_hidden_layers = 12  
+    modelConfig_2.adapter_nums = 6  
+    modelConfig_2.has_adapter = True  
+    modelConfig_2.isLinear = False  
+    modelConfig_2.num_labels = num_token  
     model_2 = BertAdapterForSequenceClassification.from_pretrained(model_path, config=modelConfig_2)
 
     model_2.to(device)
@@ -264,7 +262,7 @@ def down_cost():
     )
     scheduler_2 = torch.optim.lr_scheduler.ExponentialLR(optimizer_2, gamma=0.7)
 
-    print("Full Model Higher Adapters更新训练--------")
+    print("Full Model Higher Adapters--------")
     for name, param in model_2.named_parameters():
         if param.requires_grad:
             print(name)
@@ -275,11 +273,11 @@ def down_cost():
 
     method.setup_seed(seed)
     modelConfig_3 = BertConfig.from_pretrained(model_path)
-    modelConfig_3.num_hidden_layers = 6  # 相当于构建一个小模型，transformer层只有六层
-    # modelConfig_2.adapter_nums = 6  # 高层含有adapters的数目
-    modelConfig_3.has_adapter = True  # 设置开启adapter(diy)
-    modelConfig_3.isLinear = False  # 非线性参数
-    modelConfig_3.num_labels = num_token  # 设置分类模型的输出个数
+    modelConfig_3.num_hidden_layers = 6 
+    # modelConfig_2.adapter_nums = 6 
+    modelConfig_3.has_adapter = True 
+    modelConfig_3.isLinear = False 
+    modelConfig_3.num_labels = num_token 
     model_3 = BertAdapterForSequenceClassification.from_pretrained(model_path, config=modelConfig_3)
 
     model_3.to(device)
@@ -297,7 +295,7 @@ def down_cost():
     )
     scheduler_3 = torch.optim.lr_scheduler.ExponentialLR(optimizer_3, gamma=0.7)
 
-    print("LayerBert_06 adapters更新训练--------")
+    print("LayerBert_06 adapters--------")
     for name, param in model_3.named_parameters():
         if param.requires_grad:
             print(name)
@@ -306,10 +304,10 @@ def down_cost():
     t8 = timer()
     print("-----------------------")
 
-    print("Full Model全部参数训练耗时：%s S" % (t2 - t1))
-    print("Full Model全部adapters训练耗时：%s S" % (t4 - t3))
-    print("Full Model Higher adapters参数训练耗时：%s S" % (t6 - t5))
-    print("LayerBert_06 adapters参数训练耗时：%s S" % (t8 - t7))
+    print("Full Model full parameters  training cost: %s S" % (t2 - t1))
+    print("Full Model full adapters  training cost: %s S" % (t4 - t3))
+    print("Full Model Higher adapters training cost: %s S" % (t6 - t5))
+    print("LayerBert_06 adapters training cost: %s S" % (t8 - t7))
 
 
 def different_length():
@@ -321,21 +319,21 @@ def different_length():
     file_path = './data/datasets/Computer/test_0_128.pt'
     # file_path = './data/datasets/Center/Biology_128.pt'
 
-    print("数据加载中-------")
+    print("Data loading-------")
     tokenizer = BertTokenizerFast.from_pretrained(model_path0, do_lower_case=True)
     datasets = torch.load(file_path)
     data_collator = DataCollatorForLanguageModeling(tokenizer=tokenizer, mlm=True, mlm_probability=0.15)
 
     dataloader = DataLoader(datasets, batch_size=batch_size, collate_fn=data_collator)
 
-    print("LayerModel_4参数更新训练--------")
+    print("LayerModel_4--------")
     model_path0 = './model/bert-base-uncased/'
     method.setup_seed(seed)
     modelConfig_0 = BertConfig.from_pretrained(model_path0)
-    modelConfig_0.num_hidden_layers = 4  # 中间仅含有6层transformer layers
+    modelConfig_0.num_hidden_layers = 4 
     model_0 = BertForMaskedLM.from_pretrained(model_path0, config=modelConfig_0)
-    model_0 = train_first(model_0)  # 仅更新第一层的参数
-    model_0 = utils.train_cls_layer(model_0)  # 输出层进行训练
+    model_0 = train_first(model_0)  
+    model_0 = utils.train_cls_layer(model_0)  
     model_0.to(device)
 
     optimizer_0 = get_optimizer(model_0, learning_rate)
@@ -347,14 +345,14 @@ def different_length():
     t2 = timer()
     print("-----------------------")
 
-    print("LayerModel_6参数更新训练--------")
+    print("LayerModel_6--------")
     model_path1 = './model/bert-base-uncased/'
     method.setup_seed(seed)
     modelConfig_1 = BertConfig.from_pretrained(model_path1)
-    modelConfig_1.num_hidden_layers = 6  # 中间仅含有6层transformer layers
+    modelConfig_1.num_hidden_layers = 6  
     model_1 = BertForMaskedLM.from_pretrained(model_path1, config=modelConfig_1)
-    model_1 = train_first(model_1)  # 仅更新第一层的参数
-    model_1 = utils.train_cls_layer(model_1)  # 输出层进行训练
+    model_1 = train_first(model_1)  
+    model_1 = utils.train_cls_layer(model_1) 
     model_1.to(device)
 
     optimizer_1 = get_optimizer(model_1, learning_rate)
@@ -366,14 +364,14 @@ def different_length():
     t4 = timer()
     print("-----------------------")
 
-    print("LayerModel_8参数更新训练--------")
+    print("LayerModel_8--------")
     model_path2 = './model/bert-base-uncased/'
     method.setup_seed(seed)
     modelConfig_2 = BertConfig.from_pretrained(model_path2)
-    modelConfig_2.num_hidden_layers = 8  # 中间仅含有6层transformer layers
+    modelConfig_2.num_hidden_layers = 8  
     model_2 = BertForMaskedLM.from_pretrained(model_path2, config=modelConfig_2)
-    model_2 = train_first(model_2)  # 仅更新第一层的参数
-    model_2 = utils.train_cls_layer(model_2)  # 输出层进行训练
+    model_2 = train_first(model_2)  
+    model_2 = utils.train_cls_layer(model_2) 
     model_2.to(device)
 
     optimizer_2 = get_optimizer(model_2, learning_rate)
@@ -385,14 +383,14 @@ def different_length():
     t6 = timer()
     print("-----------------------")
 
-    print("LayerModel_6参数更新训练--------")
+    print("LayerModel_6--------")
     model_path3 = './model/bert-base-uncased/'
     method.setup_seed(seed)
     modelConfig_3 = BertConfig.from_pretrained(model_path3)
-    modelConfig_3.num_hidden_layers = 6  # 中间仅含有6层transformer layers
+    modelConfig_3.num_hidden_layers = 6  
     model_3 = BertForMaskedLM.from_pretrained(model_path3, config=modelConfig_3)
-    # model_1 = train_first(model_1)  # 仅更新第一层的参数
-    # model_1 = utils.train_cls_layer(model_1)  # 输出层进行训练
+    # model_1 = train_first(model_1)  
+    # model_1 = utils.train_cls_layer(model_1)  
     model_3.to(device)
 
     optimizer_3 = get_optimizer(model_3, learning_rate)
@@ -404,10 +402,10 @@ def different_length():
     t8 = timer()
     print("-----------------------")
 
-    print("LayerModel_4参数训练耗时：%s S" % (t2 - t1))
-    print("LayerModel_6参数训练耗时：%s S" % (t4 - t3))
-    print("LayerModel_8参数训练耗时：%s S" % (t6 - t5))
-    print("LayerModel_6Full参数训练耗时：%s S" % (t8 - t7))
+    print("LayerModel_4 training cost: %s S" % (t2 - t1))
+    print("LayerModel_6 training cost: %s S" % (t4 - t3))
+    print("LayerModel_8 training cost: %s S" % (t6 - t5))
+    print("LayerModel_6Full training cost: %s S" % (t8 - t7))
 
 
 def main():
