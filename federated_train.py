@@ -25,7 +25,7 @@ import shutil
 #     modelConfig = BertConfig.from_pretrained(model_path)
 #     ori_model = BertForMaskedLM.from_pretrained(model_path, config=modelConfig)
 #
-#     modelConfig.num_hidden_layers = layer_num  # 相当于构建一个小模型，transformer层只有六层
+#     modelConfig.num_hidden_layers = layer_num  
 #     model = BertForMaskedLM.from_pretrained(model_path, config=modelConfig)
 #
 #     for i in range(fed_epoch):
@@ -48,8 +48,7 @@ import shutil
 #                 print("Fail")
 #
 #         print("---------------------------------")
-#         model = utils.train_trans_layer(model, [i])  # 只训练transformers层的第i层
-#         for name, param in model.named_parameters():
+#         model = utils.train_trans_layer(model, [i])  
 #             if param.requires_grad:
 #                 print(name)
 
@@ -97,23 +96,23 @@ def pro_fed():
     file_path = './data/datasets/Biology/'
     param_dict = './outputs/LayerModel/Biology/NewPro_0-11/'
 
-    name_list = natsort.natsorted(os.listdir(file_path), alg=natsort.ns.PATH)  # 各个client的训练语料
-    param_container = utils.create_container()  # 制作本地参数容器
+    name_list = natsort.natsorted(os.listdir(file_path), alg=natsort.ns.PATH)  # corpus of client
+    param_container = utils.create_container()  # create local data parameters pool
 
-    model_list = []  # 记录各个客户端的参数
+    model_list = []  # record model
     for i in range(device_num):
-        # layer_num = random.randint(3, 7)  # 产生模型架构层数，3-6之间
+        # layer_num = random.randint(3, 7)  
 
-        print("模型transformer层数为：%d" % layer_num)
+        print("the number of transformers layer is %d" % layer_num)
 
         modelConfig = BertConfig.from_pretrained(model_path)
-        modelConfig.num_hidden_layers = layer_num  # 相当于构建一个小模型，transformer层只有六层
+        modelConfig.num_hidden_layers = layer_num  # local small model
         model = BertForMaskedLM.from_pretrained(model_path, config=modelConfig)
 
         model_list.append(model)
 
     for i in range(fed_epoch):
-        # 记录本轮联邦存储的位置，如果文件夹不存在，则进行文件夹的创建
+        # Record the location of the current round of federal storage, and if the folder does not exist, create the folder
         epoch_save = param_dict + 'epoch_' + str(i + 1) + '/'
         if not os.path.exists(epoch_save):
             os.makedirs(epoch_save)
@@ -134,27 +133,27 @@ def pro_fed():
             change_flag = False
 
         for j in range(device_num):
-            print("%d轮联邦%d号设备训练中------" % (i + 1, j))
+            print("%d epoch %d client is training------" % (i + 1, j))
             param_save = epoch_save + 'client_' + str(j) + '.pt'
             param_read = param_dict + 'epoch_' + str(i) + '/fed_avg.pt'
 
-            # 映射为当前想要训练的模型层
+            # mapping
             model_list[j] = utils.map3to12(model_list[j], layer_list, param_container)
 
             if change_flag:
-                # 如果不是第一轮联邦训练，则更新模型之前训练得到的参数
+                # If it is not the first round of federated training, the parameters obtained from the previous training of the model are updated
                 param_container = utils.update_container(param_container, param_read)
                 model_list[j] = utils.re_param(model_list[j], param_read)
 
-            model_list[j] = utils.train_trans_layer(model_list[j], [0, 1, 2])  # 只训练transformers层的第i层
-            #
+            model_list[j] = utils.train_trans_layer(model_list[j], [0, 1, 2])  # 
+           
             model_list[j] = dp_pretrain(learning_rate=5e-5, epochs=1, batch_size=256,
                                         model=model_list[j], file_path=file_path + name_list[j])
 
-            # 保存client更新的参数
+
             utils.layer_save(model_list[j], param_save)
 
-        # 进行联邦聚合
+        # merge
         utils.federated_efficient_merge(epoch_save)
 
 
@@ -169,74 +168,67 @@ def fed_train():
     file_path = './data/datasets/'+domain+'/'
     param_dict = './outputs/LayerModel/Ablation/'+domain+'/Pro3_8_e5/'
 
-    name_list = natsort.natsorted(os.listdir(file_path), alg=natsort.ns.PATH)  # 各个client的训练语料
-    param_container = utils.create_container()  # 制作本地参数容器
+    name_list = natsort.natsorted(os.listdir(file_path), alg=natsort.ns.PATH)  # client corpus
+    param_container = utils.create_container()  # create local parameters pool
 
-    model_list = []  # 记录各个客户端的参数
+    model_list = [] 
     for i in range(device_num):
-        # layer_num = random.randint(3, 7)  # 产生模型架构层数，3-6之间
+        # layer_num = random.randint(3, 7)  #create layer list，3-6之间
 
-        print("模型transformer层数为：%d" % layer_num)
+        print("the number of ransformers layers is %d" % layer_num)
 
         modelConfig = BertConfig.from_pretrained(model_path)
-        modelConfig.num_hidden_layers = layer_num  # 相当于构建一个小模型，transformer层只有六层
+        modelConfig.num_hidden_layers = layer_num  # local small model
         model = BertForMaskedLM.from_pretrained(model_path, config=modelConfig)
-        # model = utils.map9to3(model)  # 平均高层
+        # model = utils.map9to3(model)  # averge higher layers
 
         model_list.append(model)
 
+    remain_epoch = fed_epoch
+    drop_layer = 1
     for i in range(fed_epoch):
-        # 记录本轮联邦存储的位置，如果文件夹不存在，则进行文件夹的创建
+        # Record the location of the current round of federal storage, and if the folder does not exist, create the folder
         epoch_save = param_dict + 'epoch_' + str(i + 1) + '/'
         if not os.path.exists(epoch_save):
             os.makedirs(epoch_save)
 
-        if i < 3:
-            drop_layer = 1
-        elif i < 4:
-            drop_layer = 2
-        else:
-            drop_layer = 3
-        # drop_layer = 1
+        if i == (fed_epoch - math.floor(remain_epoch / 2)):
+            # PL-SDL, now training layer is drop_layer -1 th T-layers
+            drop_layer += 1
+            remain_epoch = fed_epoch - i
 
         for j in range(device_num):
-            print("%d轮联邦%d号设备训练中------" % (i + 1, j))
+            print("%d epoch %d client ------" % (i + 1, j))
 
             param_save = epoch_save + 'client_' + str(j) + '.pt'
             param_read = param_dict + 'epoch_' + str(i) + '/fed_avg.pt'
 
             if i != 0:
-                # 如果不是第一轮联邦训练，则更新模型之前训练聚合得到的参数
+                # If not the first round of federated training, update the parameters obtained from the training aggregation before the model
                 param_container = utils.update_container(param_container, param_read)
                 model_list[j] = utils.re_param(model_list[j], param_read)
 
             for e in range(1):
-                # 在本地进行训练，每次训练都进行重新构建后续参数
-                # 每一轮都新构建一下小模型后续层的参数
-                # if i == 0 or i == 3 or i == 4:
-                #     #  每轮换层时才更改mapping
+            
+               
                 model_list[j] = utils.rebuild_model(model_list[j], param_container, layer_length=layer_num - drop_layer,
                                                     drop_layer=drop_layer, ori_layer=drop_layer - 1)
                 if e > 0:
-                    # 记录上次训练结果
+                    
                     model_list[j] = utils.re_param(model_list[j], param_save)
-                model_list[j] = utils.train_trans_layer(model_list[j], [drop_layer - 1])  # 只训练transformers层的第i层
-                model_list[j] = utils.train_cls_layer(model_list[j])  # 训练分类层
+                model_list[j] = utils.train_trans_layer(model_list[j], [drop_layer - 1])  
+                model_list[j] = utils.train_cls_layer(model_list[j]) 
 
-                # 在further pretrain中重构模型的后续层
+                #  rebuild deeper layers
                 model_list[j] = dp_pretrain(learning_rate=5e-5, epochs=1, batch_size=256,
                                             model=model_list[j], file_path=file_path + name_list[j])
-
-                # 保存client更新的参数
+     
                 utils.layer_save(model_list[j], param_save)
 
-                # 更新客户端本地训练参数
                 # param_container = utils.update_container(param_container, param_save)
                 # model_list[j] = utils.re_param(model_list[j], param_save)
 
-        # print("测试第%d轮联邦后训练结果：" % (i + 1))
-
-        # 进行联邦聚合
+        # merge
         utils.federated_efficient_merge(epoch_save)
 
 
@@ -255,21 +247,14 @@ def center_train():
     # modelConfig.num_hidden_layers = layer_num
     model = BertForMaskedLM.from_pretrained(model_path, config=modelConfig)
 
-    # model = utils.map9to3(model)  # 平均高层参数
-
-    # param_container = utils.create_container()  # 制作本地参数容器
+    # model = utils.map9to3(model)  
+    # param_container = utils.create_container() 
 
     for i in range(center_epoch):
         epoch_save = param_dict + 'epoch_' + str(i + 1) + '/'
         if not os.path.exists(epoch_save):
             os.makedirs(epoch_save)
 
-        # if i < 3:
-        #     drop_layer = 1
-        # elif i < 4:
-        #     drop_layer = 2
-        # else:
-        #     drop_layer = 3
 
         param_save = epoch_save + 'layer.pt'
         param_read = param_dict + 'epoch_' + str(i) + '/layer.pt'
@@ -279,8 +264,7 @@ def center_train():
 
         if i > 0:
             model = utils.re_param(model, param_read)
-        # model = utils.train_trans_layer(model, [drop_layer - 1])  # 只训练transformers层的第i层
-
+        # model = utils.train_trans_layer(model, [drop_layer - 1])  # 
         for name, params in model.named_parameters():
             if params.requires_grad:
                 print("True:" + name)
@@ -291,9 +275,7 @@ def center_train():
 
         utils.layer_save(model, param_save)
 
-        # 更新参数
-        # param_container = utils.update_container(param_container, param_save)
-
+        
 
 def layer_train():
     layers = 6
@@ -324,40 +306,38 @@ def traditional_FL():
     file_path = './data/datasets/Computer/'
     param_dict = './outputs/LayerModel/Computer/Bert_FL/'
 
-    name_list = natsort.natsorted(os.listdir(file_path), alg=natsort.ns.PATH)  # 各个client的训练语料
-
-    model_list = []  # 记录各个客户端的参数
+    name_list = natsort.natsorted(os.listdir(file_path), alg=natsort.ns.PATH)  
+    model_list = [] 
     for i in range(device_num):
 
         modelConfig = BertConfig.from_pretrained(model_path)
         model = BertForMaskedLM.from_pretrained(model_path, config=modelConfig)
-        # model = utils.map9to3(model)  # 平均高层
+        # model = utils.map9to3(model)  
 
         model_list.append(model)
 
     for i in range(fed_epoch):
-        # 记录本轮联邦存储的位置，如果文件夹不存在，则进行文件夹的创建
+        # Record the location of the current round of federal storage, and if the folder does not exist, create the folder
         epoch_save = param_dict + 'epoch_' + str(i + 1) + '/'
         if not os.path.exists(epoch_save):
             os.makedirs(epoch_save)
 
         for j in range(device_num):
-            print("%d轮联邦%d号设备训练中------" % (i + 1, j))
+            print("%d epoch %d device training------" % (i + 1, j))
 
             param_save = epoch_save + 'client_' + str(j) + '.pt'
             param_read = param_dict + 'epoch_' + str(i) + '/fed_avg.pt'
 
             if i != 0:
-                # 如果不是第一轮联邦训练，则更新模型之前训练聚合得到的参数
+                # If not the first round of federated training, update the parameters obtained from the training aggregation before the model
                 model_list[j] = utils.re_param(model_list[j], param_read)
 
             model_list[j] = dp_pretrain(learning_rate=5e-5, epochs=1, batch_size=256,
                                         model=model_list[j], file_path=file_path + name_list[j])
-
-            # 保存client更新的参数
+ 
             utils.layer_save(model_list[j], param_save)
 
-        # 进行联邦聚合
+        # merge
         utils.federated_efficient_merge(epoch_save)
 
 
