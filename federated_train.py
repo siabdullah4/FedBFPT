@@ -160,13 +160,13 @@ def pro_fed():
 def fed_train():
     fed_epoch = 5
     device_num = 6
-    layer_num = 8
+    layer_num = 6
 
     domain = 'Computer'
 
     model_path = './model/bert-base-uncased/'
     file_path = './data/datasets/'+domain+'/'
-    param_dict = './outputs/LayerModel/Ablation/'+domain+'/Pro3_8_e5/'
+    param_dict = './outputs/LayerModel/Ablation/'+domain+'/Pro3_6_e5/'
 
     name_list = natsort.natsorted(os.listdir(file_path), alg=natsort.ns.PATH)  # client corpus
     param_container = utils.create_container()  # create local parameters pool
@@ -185,7 +185,7 @@ def fed_train():
         model_list.append(model)
 
     remain_epoch = fed_epoch
-    drop_layer = 1
+    drop_layer = 1 # now train drop_layer-1th transformers
     for i in range(fed_epoch):
         # Record the location of the current round of federal storage, and if the folder does not exist, create the folder
         epoch_save = param_dict + 'epoch_' + str(i + 1) + '/'
