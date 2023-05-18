@@ -7,7 +7,7 @@ import os
 
 import natsort
 
-os.environ["CUDA_VISIBLE_DEVICES"] = '0,1,2,3'
+os.environ["CUDA_VISIBLE_DEVICES"] = '0,1,2,3'  # the cuda device you can choose
 import torch
 from transformers import BertConfig, BertForMaskedLM
 
