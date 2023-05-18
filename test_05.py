@@ -34,22 +34,22 @@ def baseline_test():
     # Pro3_6_e5 = './outputs/LayerModel/' + domain + '/Try_Pro3_6_e5/layer0_2.pt'
     cls_Pro3_6_e5 = './outputs/LayerModel/' + domain + '/cls_Pro3_6_e5/layer0_2.pt'
 
-    print("DistillBert训练----")
+    print("DistillBert----")
     model_path0 = './model/DistillBert/'
     val_acc0, test_acc0 = ner_train(learn_rate, model_path0, epoch, device, batch_size,
                                     change_param=Distill_Path, seed=seed)
     #
-    print("TinyBert_4训练----")
+    print("TinyBert_4----")
     model_path1 = './model/TinyBert_4/'
     val_acc1, test_acc1 = ner_train(learn_rate, model_path1, epoch, device, batch_size,
                                     change_param=TinyBert_4_Path, seed=seed)
 
-    print("TinyBert_6训练----")
+    print("TinyBert_6----")
     model_path2 = './model/TinyBert_6/'
     val_acc2, test_acc2 = ner_train(learn_rate, model_path2, epoch, device, batch_size,
                                     change_param=TinyBert_6_Path, seed=seed)
 
-    print("cls_Pro3_6_e5训练----")
+    print("cls_Pro3_6_e5----")
     model_path3 = './model/bert-base-uncased/'
     val_acc3, test_acc3 = ner_train(learn_rate, model_path3, epoch, device, batch_size,
                                     change_param=cls_Pro3_6_e5, seed=seed)
@@ -99,20 +99,20 @@ def method_test():
     cls_Pro3_6_e5 = './outputs/LayerModel/' + domain + '/cls_Pro3_6_e5/layer0_2.pt'
     # Pro3_6_e5 = './outputs/LayerModel/' + domain + '/Try_Pro3_6_e5/layer0_2.pt'
 
-    print("Bert训练----")
+    print("Bert----")
     val_acc0, test_acc0 = ner_train(learn_rate, model_path, epoch, device, batch_size,
                                     seed=seed)
 
-    print("Bert_Center训练----")
+    print("Bert_Center----")
     val_acc1, test_acc1 = ner_train(learn_rate, model_path, epoch, device, batch_size,
                                     change_param=Bert_Center, seed=seed)
 
-    print("Bert_FL训练----")
+    print("Bert_FL----")
     val_acc2, test_acc2 = ner_train(learn_rate, model_path, epoch, device, batch_size,
                                     change_param=Bert_FL, seed=seed)
 
     #
-    print("cls_Pro3_6_e5训练----")
+    print("cls_Pro3_6_e5----")
     val_acc3, test_acc3 = ner_train(learn_rate, model_path, epoch, device, batch_size,
                                     change_param=cls_Pro3_6_e5, seed=seed)
 
