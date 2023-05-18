@@ -30,18 +30,18 @@ from torch.utils.data import TensorDataset, RandomSampler, DataLoader
 def clean_pdf():
     sentences = []
     with pdfplumber.open("papers/test01.pdf") as pdf:
-        for page in pdf.pages:  # 按页读取pdf文件
+        for page in pdf.pages:  # read pdf in pages
             text = page.extract_text()
-            text = re.sub(r'[0-9]+', '', text)  # 去除数字
-            text = text.strip('\n')  # 去掉换行符
-            text = text.split('.')  # 按句子划分
+            text = re.sub(r'[0-9]+', '', text)  # Remove the numbers
+            text = text.strip('\n')  # Remove the '\n'
+            text = text.split('.')  # split sentence
             sentences.extend(text)
 
     for sentence in sentences:
         if len(sentence) < 20:
             sentences.pop(sentences.index(sentence))
         else:
-            sentence = sentence.replace('\n', '')  # 去掉换行符
+            sentence = sentence.replace('\n', '')  # Remove the '\n'
             print(sentence)
             print("----------------")
 
@@ -53,7 +53,7 @@ def read_tsv(path):
         for line in f:
             line_num += 1
             text = line.split()
-            if int(text[2]) < 300:  # 如果这个词频率过低
+            if int(text[2]) < 300:  # If the word is too infrequently
                 continue
             else:
                 word = text[0]
@@ -71,8 +71,7 @@ def read_tsv(path):
 
 def read_vocab(path):
     """
-    读取文件词表
-    :param path: 词表地址，返回词表列表
+    :param path: Thesaurus address, which returns a list of thesauruses
     :return:
     """
     vocab_list = []
@@ -86,14 +85,13 @@ def read_vocab(path):
 
 def check_token(ori_vocab, new_vocab):
     """
-    将新老词表进行比较，将老词表中不存在的词追加在老词表末尾
-    模型在加载新词表时，由于长度与原词表不一致，使用
-    model.resize_token_embeddings(len(tokenizer))
-    对模型Resize，使用原来的词语embeddings
-    :param ori_vocab: 原词表的地址
-    :param new_vocab: 新词表的地址
+    Compare the old and new vocabulary and append words that do not exist in the old vocabulary to the end of the old vocabulary
+    When the model loads a new vocabulary, it is used because the length is inconsistent with the original vocabulary
+    model.resize_token_embeddings(len(tokenizer)) for model Resize, use the original word embeddings
+    :param ori_vocab: The address of the original vocabulary
+    :param new_vocab: The address of the new vocabulary
     """
-    ori_token = read_vocab(ori_vocab)  # 读取词表
+    ori_token = read_vocab(ori_vocab)  
     new_token = read_vocab(new_vocab)
     res = []
     print("comparing token......")
@@ -103,12 +101,12 @@ def check_token(ori_vocab, new_vocab):
                 res.append(vocab)
                 file.write(vocab)
 
-    print('新增token数目：%d' % len(res))
+    print('the number of new token: %d' % len(res))
 
 
 def read_json(path):
     datas = []
-    print("处理json数据中------")
+    print("Process JSON data------")
     with open(path, 'r', encoding='utf-8') as file:
         for line in tqdm(file.readlines()):
             dic = json.loads(line)
@@ -119,15 +117,15 @@ def read_json(path):
 
 def label2num(path):
     """
-    提取文本分类任务训练中的所有标签类别
-    :param path: 文本分类任务数据所在的文件夹的地址
-    :return:句子所有类别的字典，可以获知句子的总体种类数，并根据这个得到标签的对应数字标签
+    Extract all label categories in the text classification task training
+    :param path: The address of the folder where the text classification task data is located
+    :return:The dictionary of all categories of sentences can get the overall number of types of sentences, and get the corresponding number labels of labels according to this
     """
-    label_num = {}  # 标签字典
-    token_num = 0  # 标签编号
-    files = os.listdir(path)  # 得到文件夹下的所有文件名称
-    for file in files:  # 遍历文件夹
-        position = path + file  # 构造绝对路径
+    label_num = {}  # label dictionary
+    token_num = 0  # label index
+    files = os.listdir(path)  # Get the names of all files under the folder
+    for file in files:  # Traverse the folder
+        position = path + file  # Construct an absolute path
         with open(position, 'r', encoding='utf-8') as file:
             for line in tqdm(file.readlines()):
                 dic = json.loads(line)
@@ -142,25 +140,25 @@ def label2num(path):
 
 def create_text(in_path, out_path, start=0, end=-1):
     """
-    根据语料jsonl文件生成对应的处理好的训练数据
-    :param in_path: 语料文件的地址，语料文件为jsonl格式
-    :param out_path: 输出txt文件的地址，输出的txt文件中每一行是一句语料文件中的正文内容
-    :param start:文档起始位置
-    :param end:需要构建的txt文档长度
+    Generate the corresponding processed training data according to the corpus JSONL file
+    :param in_path: The address of the corpus file, which is in JSON format
+    :param out_path: The address of the output txt file, each line in the output txt file is the body content of a sentence corpus file
+    :param start:The starting position of the document
+    :param end:The length of the txt document that needs to be built
     """
-    with open(out_path, "w") as f:
+    with open(out_path, "a") as f: # append to the sentence, you can change to 'w'
         nlp = spacy.load("en_core_sci_sm")
-        print("处理文章中......")
+        print("progress the article......")
         with open(in_path, 'r', encoding='utf-8') as papers:
             for line in tqdm(papers.readlines()[start:end]):
                 paper = json.loads(line)
-                abstract_text = paper['abstract']  # 摘要列表
-                body_text = paper['body_text']  # 主体列表
-                for abstract in abstract_text:  # 所有的摘要内容
+                abstract_text = paper['abstract']  # the list of abstract
+                body_text = paper['body_text']  # the list of body
+                for abstract in abstract_text:  # all abstract
                     text0 = abstract['text']
                     doc = nlp(text0)
-                    list_text = list(doc.sents)  # 进行划分句子
-                    for sentence in list_text:  # 写入文件
+                    list_text = list(doc.sents)  # split sentence
+                    for sentence in list_text:  # write
                         f.write(str(sentence) + '\n')
                 for body in body_text:
                     text1 = body['text']
@@ -172,9 +170,9 @@ def create_text(in_path, out_path, start=0, end=-1):
 
 def ner_label(path):
     tag_list = []
-    files = natsort.natsorted(os.listdir(path), alg=natsort.ns.PATH)  # 文件夹下的文件名称  # 得到文件夹下的所有文件名称
-    for file in files:  # 遍历文件夹
-        position = path + file  # 构造绝对路径
+    files = natsort.natsorted(os.listdir(path), alg=natsort.ns.PATH)  # File names under folders # Get all file names under folders
+    for file in files:  # Traverse the folder
+        position = path + file  # Construct an absolute path
         with open(position, 'r', encoding='utf-8') as doc:
             for line in tqdm(doc.readlines()):
                 if 'DOCSTART' in line:
@@ -186,9 +184,9 @@ def ner_label(path):
                         tmp = line.split()
                         tag_list.append(tmp[-1])
 
-    # unique_tags 代表有多少种标签，tag2id表示每种标签对应的id，id2tag表示每种id对应的标签。
+    # unique_tags represents how many kinds of tags there are, tag2id represents the ID corresponding to each tag, and id2tag represents the label corresponding to each ID
     unique_tags = list(set(tag_list))
-    unique_tags = sorted(unique_tags)  # 转列表并排序，保证每次的tag id对应关系一致
+    unique_tags = sorted(unique_tags)  # Go to the table and sort to ensure that the tag ID correspondence is consistent each time
     tag2id = {tag: tag_id for tag_id, tag in enumerate(unique_tags)}
     id2tag = {tag_id: tag for tag, tag_id in tag2id.items()}
 
@@ -197,31 +195,31 @@ def ner_label(path):
 
 def train_token(filepath, save_path):
     """
-    训练新的词表
-    :param filepath: 语料地址，txt格式
-    :param save_path: 保存训练好的vocab.txt格式的地址
+    train new vocab token
+    :param filepath: Corpus address, in txt format
+    :param save_path: Save the address of the trained vocab .txt format
     """
-    # 创建分词器
+    # Create a tokenizer
     bwpt = tokenizers.BertWordPieceTokenizer()
 
-    # 训练分词器
+    # Train the tokenizer
     bwpt.train(
         files=filepath,
-        vocab_size=30000,  # 这里预设定的词语大小不是很重要
+        vocab_size=30000,  # The preset word size here is not very important
         min_frequency=10,
         limit_alphabet=1000
     )
-    # 保存训练后的模型词表
+    # Save the trained model vocabulary
     bwpt.save_model(save_path)
 
-    # 加载刚刚训练的tokenizer
+    # Load the tokenizer you just trained
     tokenizer = BertTokenizer(vocab_file=save_path + 'vocab.txt')
 
     sequence0 = "Setrotech is a part of brain"
     tokens0 = tokenizer.tokenize(sequence0)
     print(tokens0)
 
-    # v_size = len(tokenizer.vocab)  # 自己设置词汇大小
+    # v_size = len(tokenizer.vocab)  # Set the vocabulary size yourself
     # print(v_size)
     # model = BertForMaskedLM.from_pretrained("./Bert/bert-base-uncased")
     # model.resize_token_embeddings(len(tokenizer))
@@ -240,54 +238,53 @@ def add_token(path):
     for word in tqdm(word_list):
         tokenizer.add_tokens(word)
 
-    # 关键步骤，resize_token_embeddings输入的参数是tokenizer的新长度
+    # The key step, resize_token_embeddings input parameter is the new length of tokenizer
     model.resize_token_embeddings(len(tokenizer))
 
     tokens1 = tokenizer.tokenize(sequence0)
     print(tokens1)
 
-    tokenizer.save_pretrained("Pretrained_LMs/bert-base-cased")  # 还是保存到原来的bert文件夹下，这时候文件夹下多了三个文件
+    tokenizer.save_pretrained("Pretrained_LMs/bert-base-cased")  # It is still saved to the original BERT folder, and there are three more files under the folder
 
 
 def plot_res(title, legend, datas):
-    # 全部的线段风格
-    styles = ['c:s', 'y:8', 'b:p', 'r:^', 'g:D', 'm:X', 'r:v', ':>']  # 其他可用风格 ':<',':H','k:o','k:*','k:*','k:*'
+    # All line segment styles
+    styles = ['c:s', 'y:8', 'b:p', 'r:^', 'g:D', 'm:X', 'r:v', ':>']  # Other styles available ':<',':H','k:o','k:*','k:*','k:*'
 
     plt.figure(figsize=(10, 7))
-    # 设置字体
+    # set font
     plt.rcParams["font.family"] = "Times New Roman"
     plt.rcParams.update({'font.size': 22})
     plt.rc('legend', fontsize=15)
 
-    # 正式的进行画图
+    # plt 
     for i in range(len(datas)):
         x = np.arange(1, len(datas[i]) + 1)
         y = datas[i]
         plt.plot(x, y, styles[i], markersize=8, label=legend[i])
 
-    # 设置图片的x,y轴的限制，和对应的标签
+    # Set the x, y-axis limits of the image, and the corresponding labels
     # plt.xlim([0, 300])
     # plt.ylim([60, 78])
     plt.xlabel("Epochs")
     plt.ylabel("Accuracy")
     plt.title(title)
 
-    # 设置图片的方格线和图例
+    # Set the checkered lines and legend for the picture
     plt.grid()
     plt.legend(loc='lower right', framealpha=0.7)
     plt.tight_layout()
     plt.show()
 
-    # 如果想保存图片，请把plt.show注释掉，然后把下面这行代码打开注释
+    # If you want to save the image, comment out plt.show, and then open the comment on the following line of code
     # plt.savefig("img.png", dpi=800)
 
 
 def time_beijing():
     """
-    获取当前北京时间
-    :return: 返回当前北京时间
+    :return: Returns the current Beijing time
     """
-    tz = pytz.timezone('Asia/Shanghai')  # 东八区
+    tz = pytz.timezone('Asia/Shanghai')  # East 8th District
     t = datetime.datetime.fromtimestamp(int(time.time()), tz).strftime('%Y-%m-%d %H:%M:%S')
 
     return t
@@ -297,35 +294,35 @@ def create_dataloader(bert_model, file_path, device, batch_size):
     sentencses = []
 
     with open(file_path, 'r', encoding='utf-8') as file:
-        print("读取数据------")
+        print("loading data------")
         for line in tqdm(file.readlines()):
-            sent = '[CLS] ' + line + ' [SEP]'  # 获取句子
+            sent = '[CLS] ' + line + ' [SEP]'  # get sentence
             sentencses.append(sent)
 
     tokenizer = BertTokenizerFast.from_pretrained(bert_model, do_lower_case=True)
     tokenized_sents = [tokenizer.tokenize(sent) for sent in sentencses]
 
-    # 定义句子最大长度（512）
+    # max sentence length
     MAX_LEN = 128
 
-    # 将分割后的句子转化成数字  word-->idx
+    #  word-->idx
     input_ids = [tokenizer.convert_tokens_to_ids(sent) for sent in tokenized_sents]
 
-    # 做PADDING,这里使用keras的包做pad
-    # 大于128做截断，小于128做PADDING
+    # To do PADDING, here use keras' package to make pads
+    # GREATER THAN 128 FOR TRUNCATION, LESS THAN 128 FOR PADDING
     input_ids = pad_sequences(input_ids, maxlen=MAX_LEN, dtype="long", truncating="post", padding="post")
 
-    # 建立mask
+    # do mask
     attention_masks = []
     for seq in input_ids:
         seq_mask = [float(i > 0) for i in seq]
         attention_masks.append(seq_mask)
 
-    # 将数据集转化成tensor
+    # dataset to tensor
     inputs = torch.tensor(input_ids).to(device)
     masks = torch.tensor(attention_masks).to(device)
 
-    # 生成dataloader
+    # generate dataloader
     data = TensorDataset(inputs, masks)
     sampler = RandomSampler(data)
     dataloader = DataLoader(data, sampler=sampler, batch_size=batch_size)
@@ -381,12 +378,11 @@ def freeze_higher_layers(model, config):
 
 
 def pre_data(tokenizer, filepath):
-    print("加载预训练数据中------")
+    print("loading data for pretraining------")
     T1 = time.time()
-    # 通过LineByLineTextDataset接口 加载数据 #长度设置为128,
     train_dataset = LineByLineTextDataset(tokenizer=tokenizer, file_path=filepath, block_size=128)
     T2 = time.time()
-    print('加载预训练数据运行时间:%.2f 秒' % (T2 - T1))
+    print('loading data for pretraining cost:%.2f second' % (T2 - T1))
     print(time_beijing())
     print("---------------------------------------")
 
@@ -435,7 +431,7 @@ def get_subword_id(vocab_path):
     word_list = []
 
     with open(vocab_path, 'r', encoding='utf-8') as file:
-        print("获取分词词表------")
+        print("get token vocab------")
         for line in tqdm(file.readlines()):
             if "#" in line:
                 word_list.append(word_id)
