@@ -55,7 +55,7 @@ def train_high(model):
 
 
 def train_last(model):
-    # 只训练最高层的encoder layer
+    # only train the last encoder layer
     for name, param in model.named_parameters():
         if '11' in name:
             param.requires_grad = True
@@ -82,39 +82,39 @@ def train_first(model):
 #     for file in os.listdir(fed_train_path):
 #         client_list.append(fed_train_path + file + '/')
 #
-#     # 进行排序，来确定每个客户端训练的参数
+#     # sort
 #     client_list.sort()
 #     model_list = []
 #     param_list = []
 #
-#     # 构建模型列表
+#     # create model list
 #     for i in range(len(client_list)):
 #         modelConfig = BertConfig.from_pretrained(client_list[i])
 #         model = BertForMaskedLM.from_pretrained(client_list[i], config=modelConfig)
 #         model_list.append(model)
 #
-#     # 聚合低层参数
+#     # merge shallower layers
 #     for layer0, layer1 in zip(model_list[0].bert.encoder.layer[:4],
 #                               model_list[1].bert.encoder.layer[:4]):
 #         for p0, p1 in zip(layer0.parameters(), layer1.parameters()):
 #             param = (p0 + p1) / 2
 #             param_list.append(param)
 #
-#     # 聚合中层参数
+#     # merge middle layers
 #     for layer2, layer3 in zip(model_list[2].bert.encoder.layer[4:8],
 #                               model_list[3].bert.encoder.layer[4:8]):
 #         for p2, p3 in zip(layer2.parameters(), layer3.parameters()):
 #             param = (p2 + p3) / 2
 #             param_list.append(param)
 #
-#     # 聚合高层参数
+#     # merge higher layers
 #     for layer4, layer5 in zip(model_list[4].bert.encoder.layer[8:],
 #                               model_list[5].bert.encoder.layer[8:]):
 #         for p4, p5 in zip(layer4.parameters(), layer5.parameters()):
 #             param = (p4 + p5) / 2
 #             param_list.append(param)
 #
-#     # 更新模型参数
+#     # update
 #     modelConfig = BertConfig.from_pretrained(ori_path)
 #     model = BertForMaskedLM.from_pretrained(ori_path, config=modelConfig)
 #     num = 0
@@ -136,19 +136,20 @@ def train_first(model):
 
 
 def federated_global_merge():
-    # 进行联邦聚合，不但客户端模型本身训练的参数会更新，没有训练的参数也会更新为其他客户端所训练的结果
+    # For federated aggregation, not only the parameters trained by the client model itself will be updated, 
+    # but also the parameters that are not trained will be updated to the results of training by other clients
     ori_path = './model/bert-base-uncased/'
     params_path = './outputs/params/client/'
 
-    params_list = {}  # 以键值对的方式存储参数名称和参数值
-    params_nums_list = {}  # 以键值对的方式存储参数名称和参数个数，即有几个客户端的参数相同需要聚合平均
+    params_list = {}  # Store parameter names and parameter values as key-value pairs
+    params_nums_list = {}  # Store parameter names and number of parameters in the form of key-value pairs, that is, several clients with the same parameters need to be aggregated and averaged
 
     for file in os.listdir(params_path):
-        params = torch.load(params_path + file)  # 加载一个客户端的参数
-        for param_name in params:  # 遍历参数名称
-            if param_name in params_list.keys():  # 如果已经存储有此参数
-                param_value = params_list[param_name] + params[param_name]  # 加上其他客户端参数值
-                param_num = params_nums_list[param_name] + 1  # 参数数目加一
+        params = torch.load(params_path + file)  # Load a client's parameters
+        for param_name in params:  # Iterate through the parameter names
+            if param_name in params_list.keys():  # If this parameter is already stored
+                param_value = params_list[param_name] + params[param_name]  # plus other client parameter values
+                param_num = params_nums_list[param_name] + 1  # The number of parameters is incremented by one
                 params_list.update({param_name: param_value})
                 params_nums_list.update({param_name: param_num})
             else:
@@ -157,7 +158,7 @@ def federated_global_merge():
                 params_list.update({param_name: param_value})
                 params_nums_list.update({param_name: param_num})
 
-    for param_name in params_list:  # 进行FedAVG更新
+    for param_name in params_list:  # FedAVG
         param_value = params_list[param_name]
         param_num = params_nums_list[param_name]
         params_list.update({param_name: param_value / param_num})
@@ -173,18 +174,17 @@ def federated_global_merge():
 
 
 def federated_efficient_merge(params_path):
-    # 进行联邦聚合，仅客户端模型本身训练的参数会更新，各个客户端没有训练的参数保持不变
+    # For federated aggregation, only the parameters trained by the client model itself are updated, and the parameters that are not trained by each client remain unchanged
 
-    params_list = {}  # 以键值对的方式存储参数名称和参数值
-    params_nums_list = {}  # 以键值对的方式存储参数名称和参数个数，即有几个客户端的参数相同需要聚合平均
-
+    params_list = {}  # Store parameter names and parameter values as key-value pairs
+    params_nums_list = {}  # Store parameter names and number of parameters in the form of key-value pairs, that is, several clients with the same parameters need to be aggregated and averaged
     file_name = natsort.natsorted(os.listdir(params_path), alg=natsort.ns.PATH)
     for file in file_name:
-        params = torch.load(params_path + file)  # 加载一个客户端的参数
-        for param_name in params:  # 遍历参数名称
-            if param_name in params_list.keys():  # 如果已经存储有此参数
-                param_value = params_list[param_name] + params[param_name]  # 加上其他客户端参数值
-                param_num = params_nums_list[param_name] + 1  # 参数数目加一
+        params = torch.load(params_path + file)  # Load a client's parameters
+        for param_name in params:  # Iterate through the parameter names
+            if param_name in params_list.keys():  # If this parameter is already stored
+                param_value = params_list[param_name] + params[param_name]  # plus other client parameter values
+                param_num = params_nums_list[param_name] + 1  # The number of parameters is incremented by one
                 params_list.update({param_name: param_value})
                 params_nums_list.update({param_name: param_num})
             else:
@@ -193,44 +193,69 @@ def federated_efficient_merge(params_path):
                 params_list.update({param_name: param_value})
                 params_nums_list.update({param_name: param_num})
 
-    for param_name in params_list:  # 进行FedAVG更新
+    for param_name in params_list:  # FedAVG
         param_value = params_list[param_name]
         param_num = params_nums_list[param_name]
         params_list.update({param_name: param_value / param_num})
 
-    # 更新各个客户端已经训练的参数联邦后的结果，适用于各个客户端训练不同的参数
+    # The result of updating the federation of parameters trained by each client is applicable to the training of different parameters for each client
     # for file in file_name:
-    #     params = torch.load(params_path + file)  # 加载一个客户端的参数
-    #     for param_name in params:  # 遍历参数名称
-    #         # 更新模型保存的参数
+    #     params = torch.load(params_path + file)  # Load a client's parameters
+    #     for param_name in params:  # Iterate through the parameter names
+    #         # Update the parameters saved by the model
     #         params[param_name].data = params_list[param_name].data
-    #     # 存储新的客户端参数结果
+    #     # Stores the new client parameter results
     #     torch.save(params, params_path + file)
 
-    # 清空已经更新过的无用参数，适用于客户端训练相同的参数
+    # Clear the already updated useless parameters, which is suitable for the client to train the same parameters
     shutil.rmtree(params_path)
     os.makedirs(params_path)
     torch.save(params_list, params_path + 'fed_avg.pt')
 
+    
+ def federated_merge_by_weight(params_path, weight_list):
+    params_list = {}  # Store parameter names and parameter values as key-value pairs
+
+    weight_sum = sum(weight_list)
+    file_name = natsort.natsorted(os.listdir(params_path), alg=natsort.ns.PATH)
+    for i, file in enumerate(file_name):
+        params = torch.load(params_path + file)  # Load a client's parameters
+        weight = weight_list[i]
+        for param_name in params:  # Iterate through the parameter names
+            if param_name in params_list.keys():  # If this parameter is already stored
+                param_value = params_list[param_name] + weight*params[param_name]  # plus other client parameter values
+                params_list.update({param_name: param_value})
+            else:
+                param_value = weight*params[param_name]
+                params_list.update({param_name: param_value})
+
+    for param_name in params_list:  # FedAvg
+        param_value = params_list[param_name]
+        params_list.update({param_name: param_value / weight_sum})
+
+    # Clear the already updated useless parameters, which is suitable for the client to train the same parameters
+    shutil.rmtree(params_path)
+    os.makedirs(params_path)
+    torch.save(params_list, params_path + 'fed_avg.pt')
 
 def map_change(params_list, map_num):
     """
-    将小模型与大模型进行映射
-    :param params_list:原始小模型保存的参数
-    :param map_num:需要跨越的层数
-    :return:transformer 层进行更改过后的参数字典
+    Map small models to large models
+    :param params_list:Parameters saved by the original small model
+    :param map_num:The number of layers that need to be spanned
+    :return:A dictionary of parameters after the transformer layer has been changed
     """
     new_param = {}
     for ori_name in params_list.keys():
         if 'bert.encoder.layer.' in ori_name:
-            # 如果是transformer层，则进行映射
+            # If it is a transformer layer, it is mapped
             name_list = ori_name.split('.')
-            layer_num = int(name_list[3])  # 获取层数
+            layer_num = int(name_list[3])  # Gets the number of layers
             new_name = ori_name.replace(name_list[3], str(layer_num + map_num))
 
             new_param.update({new_name: params_list[ori_name]})
         else:
-            # 否则不需要进行映射
+            # Otherwise, no mapping is required
             new_param.update({ori_name: params_list[ori_name]})
 
     return new_param
@@ -238,14 +263,13 @@ def map_change(params_list, map_num):
 
 def re_param(model, param_path, map_num=-1):
     model = model.module if hasattr(model, 'module') else model
-    params_list = torch.load(param_path)  # 加载客户端的参数
-
-    if map_num != -1:  # 如果需要进行层数映射
-        # 进行层数映射
+    params_list = torch.load(param_path)  #  Load the parameters of the client
+    if map_num != -1:  # If layer mapping is required
+       
         print("Change!")
         params_list = map_change(params_list, map_num)
 
-    for name, params in model.named_parameters():  # 更新客户端的训练结果
+    for name, params in model.named_parameters():  # update
         if name in params_list.keys():
             print("Re_param " + name + " !")
             # print(name)
@@ -256,7 +280,7 @@ def re_param(model, param_path, map_num=-1):
 
 def re_adapter(model, param_path):
     model = model.module if hasattr(model, 'module') else model
-    params_dict = torch.load(param_path)  # 加载客户端的参数
+    params_dict = torch.load(param_path)  # load parameter
 
     param_list = []
     for p in params_dict.keys():
@@ -293,7 +317,7 @@ def re_transformers(model, container, param_list):
                       ".output.LayerNorm.weight",
                       ".output.LayerNorm.bias"]
 
-    params = []  # 记录下原始Bert模型参数
+    params = []  # Record the original Bert model parameters
     for i in param_list:
         for last_name in last_name_list:
             name = first_name + str(i) + last_name
@@ -301,7 +325,7 @@ def re_transformers(model, container, param_list):
             params.append(container[name])
 
     param_index = 0
-    for layer in model.bert.encoder.layer:  # 对所有的transformer层进行替换
+    for layer in model.bert.encoder.layer:  # Replace all transformer layers
         for n, p in layer.named_parameters():
             if 'adapter' in n:
                 continue
@@ -347,7 +371,7 @@ def avg_transformers(model, container):
             params.append((container[pre_name] + container[behind_name])/2)
 
     param_index = 0
-    for layer in model.bert.encoder.layer:  # 对所有的transformer层进行替换
+    for layer in model.bert.encoder.layer:  # Replace all transformer layers
         for n, p in layer.named_parameters():
             if 'adapter' in n:
                 continue
@@ -366,7 +390,7 @@ def avg_transformers(model, container):
 def share_param(model, param_path):
     model = model.module if hasattr(model, 'module') else model
 
-    params_dict = torch.load(param_path)  # 加载客户端的参数
+    params_dict = torch.load(param_path)  # loading parameters from client
     params_list = []
     for value in params_dict.values():
         params_list.append(value)
@@ -390,12 +414,12 @@ def layer_save(model, save_path):
 
 def rebuild_model(model, container, layer_length, drop_layer=1, ori_layer=-1):
     """
-    重新构建模型的后续transformer层参数
-    :param model:LayerBert模型,只有几层的transformer模型
-    :param container:本地参数容器，保存有模型的参数
-    :param layer_length: 从大模型选择映射的transformer层数量
-    :param drop_layer: 跳过几层开始替换后续模型参数，默认跳过1层参数
-    :param ori_layer:保持一层参数同parameter_container一致，用于训练
+    Subsequent transformer layer parameters for rebuilding the model
+    :param model:LayerBert, only have several transformer layers
+    :param container:A local parameter container that holds the parameters of the model
+    :param layer_length: Select the number of mapped transformer layers from the large model
+    :param drop_layer: Skip a few layers to replace subsequent model parameters, and skip layer 1 parameter by default
+    :param ori_layer:Keep a layer of parameters consistent with the parameter_container for training
     """
     # print("Rebuild Model......")
     model = model.module if hasattr(model, 'module') else model
@@ -418,13 +442,13 @@ def rebuild_model(model, container, layer_length, drop_layer=1, ori_layer=-1):
                       ".output.LayerNorm.weight",
                       ".output.LayerNorm.bias"]
 
-    if layer_length != 0:  # 如果需要进行重新构建模型
-        layer_list = np.random.randint(drop_layer, 12, size=layer_length)  # 产生[drop_layer,12)之间的随机整数来选择模型接下来要拷贝的参数
-        layer_list = np.sort(layer_list)  # 对后续层进行排序
+    if layer_length != 0:  # If you need to rebuild the model
+        layer_list = np.random.randint(drop_layer, 12, size=layer_length)  # Random integers between [drop_layer,12) are generated to select the parameters to be copied next by the model
+        layer_list = np.sort(layer_list)  # Sorts subsequent layers
         print("-----------------")
         print(layer_list)
         print("-----------------")
-        layer_param = []  # 记录下原始Bert模型参数
+        layer_param = []  # Record the original Bert model parameters
         for i in layer_list:
             params = []
             for last_name in last_name_list:
@@ -434,11 +458,11 @@ def rebuild_model(model, container, layer_length, drop_layer=1, ori_layer=-1):
             layer_param.append(params)
 
         for j in range(len(layer_param)):
-            for layer in model.bert.encoder.layer[j + drop_layer:j + drop_layer + 1]:  # 跳过的transformer层参数不需要改变
+            for layer in model.bert.encoder.layer[j + drop_layer:j + drop_layer + 1]:  # The skipped transformer layer parameters do not need to be changed
                 for p, d in zip(layer.parameters(), layer_param[j]):
                     p.data = d
 
-    # 跳过层的最后一层与原始模型的相应层的结构对应
+    # The last layer of the skipped layer corresponds to the structure of the corresponding layer of the original model
     if ori_layer != -1:
         print("Ori Layer：" + str(ori_layer))
         train_param = []
@@ -454,12 +478,12 @@ def rebuild_model(model, container, layer_length, drop_layer=1, ori_layer=-1):
 
 def lower_build(model, container, layer_length, drop_layer=1, ori_layer=-1):
     """
-        重新构建模型的后续transformer层参数
-        :param model:LayerBert模型,只有几层的transformer模型
-        :param container:本地参数容器，保存有模型的参数
-        :param layer_length: 从大模型选择映射的transformer层数量
-        :param drop_layer: 跳过几层开始替换后续模型参数，默认跳过1层参数
-        :param ori_layer:保持一层参数同parameter_container一致，用于训练
+        Subsequent transformer layer parameters for rebuilding the model
+        :param model:LayerBert, only have several transformer layers
+        :param container:A local parameter container that holds the parameters of the model
+        :param layer_length: Select the number of mapped transformer layers from the large model
+        :param drop_layer: Skip a few layers to replace subsequent model parameters, and skip layer 1 parameter by default
+        :param ori_layer:Keep a layer of parameters consistent with the parameter_container for training
         """
     # print("Rebuild Model......")
     model = model.module if hasattr(model, 'module') else model
@@ -482,28 +506,28 @@ def lower_build(model, container, layer_length, drop_layer=1, ori_layer=-1):
                       ".output.LayerNorm.weight",
                       ".output.LayerNorm.bias"]
 
-    if layer_length != 0:  # 如果需要进行重新构建模型
+    if layer_length != 0:  # If you need to rebuild the model
         layer_list = np.random.randint(0, 12 - drop_layer,
-                                       size=layer_length)  # 产生[0,12-drop_layer)之间的随机整数来选择模型接下来要拷贝的参数
-        layer_list = np.sort(layer_list)  # 对后续层进行排序
+                                       size=layer_length)  # Random integers between [0,12-drop_layer) are generated to select the parameters to be copied by the model next
+        layer_list = np.sort(layer_list)  # Sorts subsequent layers
         print("-----------------")
         print(layer_list)
         print("-----------------")
-        layer_param = []  # 记录下原始Bert模型参数
+        layer_param = []  # Record the original Bert model parameters
         for i in layer_list:
             params = []
             for last_name in last_name_list:
                 name = first_name + str(i) + last_name
                 # print("Rebuild：" + name)
-                params.append(container[name])  # 记录这一层的参数
+                params.append(container[name])  # Record the parameters for this layer
             layer_param.append(params)
 
         for j in range(len(layer_param)):
-            for layer in model.bert.encoder.layer[j:j + 1]:  # 将低层参数进行改变
+            for layer in model.bert.encoder.layer[j:j + 1]:  # Change the low-level parameters
                 for p, d in zip(layer.parameters(), layer_param[j]):
                     p.data = d
 
-    # 跳过层的最后一层与原始模型的相应层的结构对应
+    # The last layer of the skipped layer corresponds to the structure of the corresponding layer of the original model
     if ori_layer != -1:
         print("Ori Layer：" + str(ori_layer))
         train_param = []
@@ -604,15 +628,15 @@ def create_container():
         if 'encoder' in name:
             param_list.update({name: param})
 
-    # 返回初始的本地参数容器
+    # Returns the initial local parameter container
     return param_list
 
 
 def update_container(container, param_path, map_num=-1):
-    params_list = torch.load(param_path)  # 加载聚合后的参数
+    params_list = torch.load(param_path)  # Parameters after loading aggregations
 
-    if map_num != -1:  # 如果需要进行层数映射
-        # 进行层数映射
+    if map_num != -1:  # If layer mapping is required
+        # Map the number of layers
         print("Change!")
         params_list = map_change(params_list, map_num)
 
@@ -627,11 +651,11 @@ def update_container(container, param_path, map_num=-1):
 
 def map3to12(model, layer_list, container):
     """
-    将原始模型的12层中根据layer——list映射到对应的model中，
-    model的transformer 层只有三层
-    :param model: 小模型只有三层
-    :param layer_list: 需要映射的模型层数,共有三个
-    :param container: 本地的参数容器
+    Map the 12 layers of the original model according to the layer-list to the corresponding model,
+    small model have 3 transformer
+    :param model: 
+    :param layer_list: There are three model layers that need to be mapped
+    :param container: local parameters pool
     """
     model = model.module if hasattr(model, 'module') else model
 
@@ -680,11 +704,11 @@ def map9to3(model):
         layer_index = 3 + i // 3
         for n, p in layer.named_parameters():
             param_name = first_name + str(layer_index) + '.' + n
-            if param_name in layer_param:  # 若存在则添加，不存在就新建
+            if param_name in layer_param:  # Add if it exists, create a new one if it does not exist
                 layer_param.update({param_name: layer_param[param_name] + p.data})
             else:
                 layer_param.update({param_name: p.data})
-            if i % 3 == 2:  # 三层一平均
+            if i % 3 == 2:  # Three layers and one average
                 layer_param.update({param_name: layer_param[param_name] / 3})
 
     for i, layer in enumerate(model.bert.encoder.layer[3:]):
